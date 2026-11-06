@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#12151c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Pianoforte">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Pianoforte per imparare</title>
+<style>
+  :root {
+    --bg1: #1e2430;
+    --bg2: #0d1017;
+    --panel: #12151c;
+    --line: #2a3140;
+    --text: #eef1f5;
+    --muted: #9aa4b2;
+    --accent: #4a90d9;
+    --accent-soft: #9fcaf5;
+    --warm: #f0b44c;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(180deg, var(--bg1), var(--bg2));
+    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+    color: var(--text);
+    padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* ---------- Barra superiore ---------- */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .title { font-size: 1.15rem; font-weight: 700; letter-spacing: .5px; white-space: nowrap; }
+  .now {
+    margin-left: auto;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 170px;
+    justify-content: flex-end;
+  }
+  .now .lbl { color: var(--muted); font-size: .8rem; }
+  .now .big { font-size: 1.9rem; font-weight: 700; color: var(--accent-soft); min-width: 3.2em; text-align: right; font-variant-numeric: tabular-nums; }
+  .now .en { color: var(--muted); font-size: .9rem; min-width: 2.2em; }
+
+  /* ---------- Controlli ---------- */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    align-items: center;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+  }
+  .group { display: flex; align-items: center; gap: 6px; }
+  .group > span { color: var(--muted); font-size: .8rem; }
+  button, select {
+    background: #1c212b;
+    color: var(--text);
+    border: 1px solid #333c4a;
+    border-radius: 9px;
+    min-height: 40px;
+    padding: 6px 12px;
+    font-size: .9rem;
+    font-family: inherit;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  button:active { background: #263040; }
+  button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.square { width: 40px; padding: 0; font-size: 1.2rem; font-weight: 700; }
+  button:disabled { opacity: .35; }
+  .range-label { min-width: 74px; text-align: center; font-weight: 600; font-size: .9rem; }
+  input[type=range] { width: 110px; accent-color: var(--accent); }
+
+  /* ---------- Avviso orientamento ---------- */
+  #rotate {
+    display: none;
+    text-align: center;
+    color: var(--warm);
+    font-size: .85rem;
+    margin-bottom: 8px;
+  }
+  @media (orientation: portrait) and (max-width: 900px) { #rotate { display: block; } }
+
+  /* ---------- Tastiera ---------- */
+  #stage {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #piano-wrap {
+    background: var(--panel);
+    border-radius: 14px;
+    padding: 12px 10px 10px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.6), inset 0 0 0 1px #262c38;
+    border-top: 6px solid #5a2a2a;
+  }
+  #piano {
+    position: relative;
+    touch-action: none;
+  }
+  .key {
+    position: absolute;
+    top: 0;
+    border-radius: 0 0 7px 7px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 8px;
+    transition: background .05s linear;
+    font-weight: 600;
+    line-height: 1.15;
+    text-align: center;
+  }
+  .white {
+    background: linear-gradient(180deg, #fdfdfd, #e6e6e8);
+    border: 1px solid #8f8f8f;
+    border-top: none;
+    z-index: 1;
+    color: #3a3f48;
+  }
+  .white.active { background: linear-gradient(180deg, #cfe8ff, #8fc0f2); }
+  .white.is-c .name { color: #b0472c; }
+  .black {
+    background: linear-gradient(180deg, #3a3a3a, #050505);
+    border: 1px solid #000;
+    z-index: 2;
+    color: #d6d6d6;
+    box-shadow: 0 3px 4px rgba(0,0,0,.45);
+  }
+  .black.active { background: linear-gradient(180deg, #5aa0e9, #1a4d80); }
+  .key .name { pointer-events: none; }
+  .key .sub { pointer-events: none; opacity: .55; font-size: .78em; font-weight: 500; }
+  .key .pc { pointer-events: none; opacity: .5; font-size: .75em; margin-top: 2px; }
+  .key .dot {
+    pointer-events: none;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--warm);
+    margin-bottom: 6px;
+    box-shadow: 0 0 0 2px rgba(240,180,76,.25);
+  }
+  .middle-tag {
+    pointer-events: none;
+    font-size: .62em;
+    color: #b07a1c;
+    margin-bottom: 4px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: .75rem;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">🎹 Pianoforte</div>
+  <div class="now" aria-live="polite">
+    <span class="lbl">Nota:</span>
+    <span class="big" id="nowIt">—</span>
+    <span class="en" id="nowEn"></span>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="group">
+    <span>Ottave</span>
+    <select id="octaves" aria-label="Numero di ottave visibili">
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="5">5</option>
+    </select>
+  </div>
+
+  <div class="group">
+    <span>Sposta</span>
+    <button class="square" id="down" aria-label="Ottava più grave">‹</button>
+    <div class="range-label" id="rangeLabel">Do3–Do6</div>
+    <button class="square" id="up" aria-label="Ottava più acuta">›</button>
+    <button id="center" title="Rimetti il Do centrale al centro">Centra</button>
+  </div>
+
+  <div class="group">
+    <span>Nomi</span>
+    <select id="labels" aria-label="Nomi sui tasti">
+      <option value="it">Do Re Mi</option>
+      <option value="en">C D E</option>
+      <option value="both">Entrambi</option>
+      <option value="none">Nessuno</option>
+    </select>
+  </div>
+
+  <div class="group">
+    <span>Suono</span>
+    <select id="timbre" aria-label="Timbro">
+      <option value="piano">Pianoforte</option>
+      <option value="organ">Organo</option>
+      <option value="triangle">Semplice</option>
+      <option value="sine">Morbido</option>
+      <option value="sawtooth">Brillante</option>
+      <option value="square">Retrò</option>
+    </select>
+  </div>
+
+  <div class="group">
+    <span>Volume</span>
+    <input type="range" id="volume" min="0" max="1" step="0.05" value="0.8" aria-label="Volume">
+  </div>
+
+  <div class="group">
+    <button id="pedal" title="Pedale di risonanza: le note continuano a suonare dopo aver alzato il dito">Pedale</button>
+    <button id="fs">Schermo intero</button>
+  </div>
+</div>
+
+<div id="rotate">↻ Gira il tablet in orizzontale per avere tasti più grandi</div>
+
+<div id="stage">
+  <div id="piano-wrap">
+    <div id="piano"></div>
+  </div>
+</div>
+
+<footer>Il pallino arancione indica il <b>Do centrale</b>. Puoi scorrere col dito sui tasti e suonare più note insieme.</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  const IT = ['Do','Do#','Re','Re#','Mi','Fa','Fa#','Sol','Sol#','La','La#','Si'];
+  const EN = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const PC_KEYS = "1234567890qwertyuiopasdfghjklzxcvbnm".split("");
+  const MIN_OCT = 1, MAX_TOP_OCT = 8;     // range totale Do1 – Do8
+  const MIDDLE_C = 60;                    // Do4
+
+  const $ = (id) => document.getElementById(id);
+  const pianoEl = $('piano'), wrapEl = $('piano-wrap'), stageEl = $('stage');
+
+  // ---------- Impostazioni (ricordate sul dispositivo se possibile) ----------
+  function load() {
+    try { return JSON.parse(localStorage.getItem('piano-settings') || 'null'); } catch (e) { return null; }
+  }
+  function save() {
+    try { localStorage.setItem('piano-settings', JSON.stringify(S)); } catch (e) {}
+  }
+  function defaultOctaves() {
+    const w = Math.max(window.innerWidth, 320);
+    if (w >= 1000) return 3;
+    if (w >= 700) return 2;
+    return 1;
+  }
+  function centeredStart(oct) { return 4 - Math.floor(oct / 2); }
+
+  const saved = load();
+  const S = Object.assign({
+    octaves: defaultOctaves(),
+    start: null,
+    labels: 'it',
+    timbre: 'piano',
+    volume: 0.8
+  }, saved || {});
+  if (S.start == null) S.start = centeredStart(S.octaves);
+
+  // ---------- Audio ----------
+  let ctx = null, out = null;
+  const voices = {};   // midi -> {nodes, master}
+  const held = {};     // midi -> quante dita/tasti lo tengono premuto
+  let pedal = false;
+
+  function audio() {
+    if (!ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ctx = new AC();
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -14; comp.knee.value = 10; comp.ratio.value = 4;
+      out = ctx.createGain();
+      out.gain.value = S.volume;
+      out.connect(comp).connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+
+  const freq = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+  function hammer(f, master, now) {
+    const dur = 0.03, n = Math.floor(ctx.sampleRate * dur);
+    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = Math.min(f * 2, 8000);
+    const g = ctx.createGain(); g.gain.value = 0.15;
+    src.connect(bp).connect(g).connect(master);
+    src.start(now);
+    return src;
+  }
+
+  function stopVoice(m, fade) {
+    const v = voices[m];
+    if (!v || !ctx) return;
+    const now = ctx.currentTime, t = fade || 0.15;
+    v.master.gain.cancelScheduledValues(now);
+    v.master.gain.setValueAtTime(Math.max(v.master.gain.value, 0.0001), now);
+    v.master.gain.exponentialRampToValueAtTime(0.0001, now + t);
+    v.nodes.forEach(n => { try { n.stop(now + t + 0.02); } catch (e) {} });
+    delete voices[m];
+  }
+
+  function startVoice(m) {
+    if (!audio()) return;
+    if (voices[m]) stopVoice(m, 0.03);
+    const f = freq(m), now = ctx.currentTime, type = S.timbre;
+    const master = ctx.createGain(); master.connect(out);
+    const nodes = [];
+    const addOsc = (mult, amp, detune, wave) => {
+      const o = ctx.createOscillator();
+      o.type = wave || 'sine';
+      o.frequency.value = f * mult;
+      if (detune) o.detune.value = detune;
+      const g = ctx.createGain(); g.gain.value = amp;
+      o.connect(g).connect(master); o.start(now); nodes.push(o);
+    };
+
+    if (type === 'piano') {
+      // le note gravi durano di più, quelle acute meno (come un vero pianoforte)
+      const decay = Math.max(1.2, 4.2 - (m - 36) * 0.045);
+      master.gain.setValueAtTime(0, now);
+      master.gain.linearRampToValueAtTime(0.3, now + 0.004);
+      master.gain.exponentialRampToValueAtTime(0.0001, now + decay);
+      [[1,1,0],[2,.5,3],[3,.25,-4],[4,.12,5],[5,.07,-6],[6,.04,7]]
+        .forEach(([mu, a, dt]) => { if (f * mu < 16000) addOsc(mu, a, dt); });
+      nodes.push(hammer(f, master, now));
+    } else if (type === 'organ') {
+      master.gain.setValueAtTime(0, now);
+      master.gain.linearRampToValueAtTime(0.17, now + 0.02);
+      [[1,1],[2,.6],[3,.35],[4,.25],[5,.15],[6,.1]]
+        .forEach(([mu, a]) => { if (f * mu < 16000) addOsc(mu, a, 0); });
+    } else {
+      master.gain.setValueAtTime(0, now);
+      master.gain.linearRampToValueAtTime(type === 'sawtooth' || type === 'square' ? 0.14 : 0.26, now + 0.01);
+      master.gain.exponentialRampToValueAtTime(0.06, now + 0.7);
+      addOsc(1, 1, 0, type);
+    }
+    voices[m] = { nodes, master };
+  }
+
+  // ---------- Premere / rilasciare ----------
+  const keyEls = {};
+
+  function press(m) {
+    held[m] = (held[m] || 0) + 1;
+    if (held[m] === 1) {
+      startVoice(m);
+      if (keyEls[m]) keyEls[m].classList.add('active');
+      showNote(m);
+    }
+  }
+  function release(m) {
+    if (!held[m]) return;
+    held[m]--;
+    if (held[m] === 0) {
+      delete held[m];
+      if (keyEls[m]) keyEls[m].classList.remove('active');
+      if (!pedal) stopVoice(m);
+    }
+  }
+  function releaseAll() {
+    Object.keys(held).forEach(k => { delete held[k]; });
+    Object.keys(voices).forEach(k => stopVoice(+k));
+    document.querySelectorAll('.key.active').forEach(el => el.classList.remove('active'));
+    pointers.clear();
+  }
+
+  function showNote(m) {
+    $('nowIt').textContent = IT[m % 12] + (Math.floor(m / 12) - 1);
+    $('nowEn').textContent = EN[m % 12] + (Math.floor(m / 12) - 1);
+  }
+
+  function setPedal(on) {
+    pedal = on;
+    $('pedal').classList.toggle('on', on);
+    $('pedal').textContent = on ? 'Pedale ON' : 'Pedale';
+    if (!on) Object.keys(voices).forEach(k => { if (!held[k]) stopVoice(+k, 0.25); });
+  }
+
+  // ---------- Costruzione tastiera ----------
+  let pcMap = {};
+
+  function render() {
+    releaseAll();
+    pianoEl.innerHTML = '';
+    for (const k in keyEls) delete keyEls[k];
+    pcMap = {};
+
+    const first = 12 * (S.start + 1);              // Do dell'ottava iniziale
+    const last = first + 12 * S.octaves;           // Do finale (chiude la tastiera)
+    const notes = [];
+    for (let m = first; m <= last; m++) notes.push(m);
+    const whites = notes.filter(m => !IT[m % 12].includes('#')).length;
+
+    // dimensioni: i tasti occupano tutta la larghezza disponibile
+    const pad = 20 + 2;
+    const availW = stageEl.clientWidth - pad;
+    const availH = stageEl.clientHeight - 24;
+    let ww = Math.floor(availW / whites);
+    ww = Math.max(22, Math.min(ww, 90));
+    let wh = Math.round(ww * 5.2);
+    wh = Math.max(140, Math.min(wh, availH, 460));
+    const bw = Math.round(ww * 0.6);
+    const bh = Math.round(wh * 0.62);
+    const fontPx = Math.max(10, Math.min(18, Math.round(ww * 0.28)));
+
+    pianoEl.style.width = (whites * ww) + 'px';
+    pianoEl.style.height = wh + 'px';
+
+    let wi = 0;
+    const blackLater = [];
+    notes.forEach((m, i) => {
+      const black = IT[m % 12].includes('#');
+      const pc = PC_KEYS[i];
+      if (pc) pcMap[pc] = m;
+      if (black) { blackLater.push({ m, left: wi * ww - bw / 2, pc }); return; }
+      const el = makeKey(m, false, wi * ww, ww, wh, fontPx, pc);
+      pianoEl.appendChild(el);
+      wi++;
+    });
+    blackLater.forEach(b => pianoEl.appendChild(makeKey(b.m, true, b.left, bw, bh, Math.max(9, fontPx - 3), b.pc)));
+
+    $('rangeLabel').textContent = 'Do' + S.start + '–Do' + (S.start + S.octaves);
+    $('down').disabled = S.start <= MIN_OCT;
+    $('up').disabled = S.start + S.octaves >= MAX_TOP_OCT;
+    $('octaves').value = S.octaves;
+    $('labels').value = S.labels;
+    $('timbre').value = S.timbre;
+    $('volume').value = S.volume;
+  }
+
+  const hasPhysicalKeyboard = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+
+  function makeKey(m, black, left, w, h, fontPx, pc) {
+    const el = document.createElement('div');
+    el.className = 'key ' + (black ? 'black' : 'white') + (m % 12 === 0 ? ' is-c' : '');
+    el.dataset.midi = m;
+    el.style.left = left + 'px';
+    el.style.width = w + 'px';
+    el.style.height = h + 'px';
+    el.style.fontSize = fontPx + 'px';
+
+    const oct = Math.floor(m / 12) - 1;
+    let html = '';
+    if (m === MIDDLE_C) {
+      html += '<div class="dot"></div>';
+      if (w >= 44) html += '<div class="middle-tag">Do centrale</div>';
+    }
+    const showBlackNames = !black || w >= 30;
+    if (S.labels !== 'none' && showBlackNames) {
+      const it = IT[m % 12], en = EN[m % 12];
+      const octTxt = (m % 12 === 0) ? oct : '';
+      if (S.labels === 'it') html += `<div class="name">${it}${octTxt ? '<span class="sub">' + octTxt + '</span>' : ''}</div>`;
+      else if (S.labels === 'en') html += `<div class="name">${en}${octTxt ? '<span class="sub">' + octTxt + '</span>' : ''}</div>`;
+      else html += `<div class="name">${it}${octTxt ? '<span class="sub">' + octTxt + '</span>' : ''}</div><div class="sub">${en}</div>`;
+    }
+    if (hasPhysicalKeyboard && pc) html += `<div class="pc">${pc.toUpperCase()}</div>`;
+    el.innerHTML = html;
+    keyEls[m] = el;
+    return el;
+  }
+
+  // ---------- Tocco / mouse (multi-touch e glissando) ----------
+  const pointers = new Map(); // pointerId -> midi | null
+
+  function keyAt(x, y) {
+    const el = document.elementFromPoint(x, y);
+    const k = el && el.closest && el.closest('.key');
+    return k ? +k.dataset.midi : null;
+  }
+
+  pianoEl.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    audio();
+    try { pianoEl.setPointerCapture(e.pointerId); } catch (err) {}
+    const m = keyAt(e.clientX, e.clientY);
+    pointers.set(e.pointerId, m);
+    if (m != null) press(m);
+  });
+  pianoEl.addEventListener('pointermove', (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    const old = pointers.get(e.pointerId);
+    const m = keyAt(e.clientX, e.clientY);
+    if (m !== old) {
+      if (old != null) release(old);
+      if (m != null) press(m);
+      pointers.set(e.pointerId, m);
+    }
+  });
+  const end = (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    const m = pointers.get(e.pointerId);
+    pointers.delete(e.pointerId);
+    if (m != null) release(m);
+  };
+  pianoEl.addEventListener('pointerup', end);
+  pianoEl.addEventListener('pointercancel', end);
+  pianoEl.addEventListener('lostpointercapture', end);
+  document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  // ---------- Tastiera fisica (se collegata) ----------
+  const downKeys = new Set();
+  window.addEventListener('keydown', (e) => {
+    if (e.target && (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT')) return;
+    if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) setPedal(!pedal); return; }
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key.toLowerCase();
+    const m = pcMap[k];
+    if (m === undefined || downKeys.has(k)) return;
+    audio();
+    downKeys.add(k);
+    press(m);
+  });
+  window.addEventListener('keyup', (e) => {
+    const k = e.key.toLowerCase();
+    if (!downKeys.has(k)) return;
+    downKeys.delete(k);
+    release(pcMap[k]);
+  });
+  window.addEventListener('blur', () => { downKeys.clear(); releaseAll(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { downKeys.clear(); releaseAll(); } });
+
+  // ---------- Controlli ----------
+  $('octaves').addEventListener('change', (e) => {
+    S.octaves = +e.target.value;
+    S.start = centeredStart(S.octaves);
+    save(); render();
+  });
+  $('down').addEventListener('click', () => { if (S.start > MIN_OCT) { S.start--; save(); render(); } });
+  $('up').addEventListener('click', () => { if (S.start + S.octaves < MAX_TOP_OCT) { S.start++; save(); render(); } });
+  $('center').addEventListener('click', () => { S.start = centeredStart(S.octaves); save(); render(); });
+  $('labels').addEventListener('change', (e) => { S.labels = e.target.value; save(); render(); });
+  $('timbre').addEventListener('change', (e) => { S.timbre = e.target.value; save(); e.target.blur(); });
+  $('volume').addEventListener('input', (e) => {
+    S.volume = +e.target.value;
+    if (out) out.gain.value = S.volume;
+    save();
+  });
+  $('pedal').addEventListener('click', () => { audio(); setPedal(!pedal); });
+
+  const fsBtn = $('fs');
+  const canFs = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+  if (!canFs) fsBtn.style.display = 'none';
+  fsBtn.addEventListener('click', () => {
+    const d = document, el = d.documentElement;
+    try {
+      if (d.fullscreenElement || d.webkitFullscreenElement) {
+        (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+      } else {
+        const p = (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+        if (p && p.catch) p.catch(() => { fsBtn.style.display = 'none'; });
+      }
+    } catch (err) { fsBtn.style.display = 'none'; }
+  });
+
+  let rt;
+  window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(render, 120); });
+
+  render();
+})();
+</script>
+
+<script>
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
+</script>
+</body>
+</html>
